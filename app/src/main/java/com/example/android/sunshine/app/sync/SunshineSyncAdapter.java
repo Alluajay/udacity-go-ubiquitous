@@ -24,6 +24,8 @@ import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
 import android.support.annotation.IntDef;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.TaskStackBuilder;
 import android.text.format.Time;
@@ -36,6 +38,9 @@ import com.example.android.sunshine.app.R;
 import com.example.android.sunshine.app.Utility;
 import com.example.android.sunshine.app.data.WeatherContract;
 import com.example.android.sunshine.app.muzei.WeatherMuzeiSource;
+import com.google.android.gms.common.ConnectionResult;
+import com.google.android.gms.common.api.GoogleApiClient;
+import com.google.android.gms.wearable.Wearable;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -52,7 +57,12 @@ import java.net.URL;
 import java.util.Vector;
 import java.util.concurrent.ExecutionException;
 
-public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
+public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener{
+
+    private GoogleApiClient mGoogleApiClient;
+    private Double mHighTemp, mLowTemp;
+    private int mWeatherId;
+
     public final String LOG_TAG = SunshineSyncAdapter.class.getSimpleName();
     public static final String ACTION_DATA_UPDATED =
             "com.example.android.sunshine.app.ACTION_DATA_UPDATED";
@@ -77,6 +87,7 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
     private static final int INDEX_MIN_TEMP = 2;
     private static final int INDEX_SHORT_DESC = 3;
 
+
     @Retention(RetentionPolicy.SOURCE)
     @IntDef({LOCATION_STATUS_OK, LOCATION_STATUS_SERVER_DOWN, LOCATION_STATUS_SERVER_INVALID,  LOCATION_STATUS_UNKNOWN, LOCATION_STATUS_INVALID})
     public @interface LocationStatus {}
@@ -89,6 +100,12 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
 
     public SunshineSyncAdapter(Context context, boolean autoInitialize) {
         super(context, autoInitialize);
+        mGoogleApiClient = new GoogleApiClient.Builder(getContext())
+                .addApi(Wearable.API)
+                .addConnectionCallbacks(this)
+                .addOnConnectionFailedListener(this)
+                .build();
+        mGoogleApiClient.connect();
     }
 
     @Override
@@ -203,6 +220,30 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
         }
         return;
     }
+
+    @Override
+    public void onConnected(@Nullable Bundle bundle) {
+        Log.e(LOG_TAG, "onConnected: success");
+        if (mHighTemp != null && mLowTemp != null) {
+            WearDataManager.sendDataToWear(mGoogleApiClient,
+                    String.valueOf(mHighTemp.intValue()),
+                    String.valueOf(mLowTemp.intValue()),
+                    mWeatherId);
+        }
+    }
+
+
+    @Override
+    public void onConnectionSuspended(int i) {
+        Log.e(LOG_TAG, "onConnectionSuspended: suspended");
+    }
+
+    @Override
+    public void onConnectionFailed(@NonNull ConnectionResult connectionResult) {
+        Log.e(LOG_TAG, "onConnectionFailed: " + connectionResult.getErrorMessage());
+    }
+
+
 
     /**
      * Take the String representing the complete forecast in JSON Format and
@@ -352,6 +393,9 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
                 weatherValues.put(WeatherContract.WeatherEntry.COLUMN_WEATHER_ID, weatherId);
 
                 cVVector.add(weatherValues);
+
+                if(i==0)
+                updateWearData(high, low, weatherId);
             }
 
             int inserted = 0;
@@ -657,5 +701,21 @@ public class SunshineSyncAdapter extends AbstractThreadedSyncAdapter {
         SharedPreferences.Editor spe = sp.edit();
         spe.putInt(c.getString(R.string.pref_location_status_key), locationStatus);
         spe.commit();
+    }
+
+
+    //wear module
+    private void updateWearData(double high, double low, int weatherId) {
+        Log.e(LOG_TAG, "updateWearData: started");
+        mHighTemp = high;
+        mLowTemp = low;
+        mWeatherId = weatherId;
+        if (mGoogleApiClient != null && mGoogleApiClient.isConnected() &&
+                mHighTemp != null && mLowTemp != null) {
+            WearDataManager.sendDataToWear(mGoogleApiClient,
+                    String.valueOf(mHighTemp.intValue()),
+                    String.valueOf(mLowTemp.intValue()),
+                    mWeatherId);
+        }
     }
 }

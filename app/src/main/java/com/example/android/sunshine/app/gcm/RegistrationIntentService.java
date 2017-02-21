@@ -30,9 +30,11 @@ import com.google.android.gms.iid.InstanceID;
 
 public class RegistrationIntentService extends IntentService {
     private static final String TAG = "RegIntentService";
+    InstanceID instanceID;
 
     public RegistrationIntentService() {
         super(TAG);
+        instanceID = InstanceID.getInstance(this.getApplicationContext());
     }
 
     @Override
@@ -45,7 +47,6 @@ public class RegistrationIntentService extends IntentService {
             synchronized (TAG) {
                 // Initially this call goes out to the network to retrieve the token, subsequent calls
                 // are local.
-                InstanceID instanceID = InstanceID.getInstance(this);
 
                 // TODO: gcm_default sender ID comes from the API console
                 String senderId = getString(R.string.gcm_defaultSenderId);

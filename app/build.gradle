@@ -33,6 +33,7 @@ dependencies {
     compile 'com.android.support:support-annotations:25.0.1'
     compile 'com.google.android.apps.muzei:muzei-api:2.0'
     compile 'com.google.android.gms:play-services-gcm:10.2.0'
+    compile 'com.google.android.gms:play-services-places:10.2.0'
     compile 'com.google.android.gms:play-services-location:10.2.0'
 
     wearApp project(':wearface')
